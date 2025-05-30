@@ -7,12 +7,15 @@ This repository is a template for development of a tool to verify adherence to t
 Given a yaml file with a list of trm entries, search the public trm and verify compliance.
 
 The structure of the dictionary:
+
+``` yaml
 trm_entries:
   - name: Red Hat Enterprise Linux (RHEL)
     tid: 6367
     decision: "Authorized w/ Constraints [18, 20, 22, 23]"
     version: "8.x"
     approval_date: "02/05/2025"
+```
 
 Compliance rules:
  - for each tid, the version level is a match for the current quaarter on the decision tab
