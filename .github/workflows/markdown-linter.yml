@@ -1,0 +1,24 @@
+on: [push, pull_request]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - uses: tj-actions/changed-files@v45
+      id: changed-files
+      with:
+        files: |
+          **/*.md
+          **/*.jsonc
+          docs/wiki/**/*.md
+          !**/.github/PULL_REQUEST_TEMPLATE.md
+        separator: ","
+    - uses: DavidAnson/markdownlint-cli2-action@v19
+      if: steps.changed-files.outputs.any_changed == 'true'
+      with:
+        config: 'custom.markdownlint.jsonc'
+        globs: ${{ steps.changed-files.outputs.all_changed_files }}
+        separator: ","

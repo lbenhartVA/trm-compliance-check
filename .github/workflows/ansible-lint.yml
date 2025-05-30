@@ -1,0 +1,41 @@
+name: "Ansible Lint"
+
+on:
+  push:
+    branches-ignore:
+      - 'master'
+      - 'gh_pages'
+  pull_request:
+    # The branches below must be a subset of the branches above
+    branches: [ master, develop,'Release-*' ]
+    paths-ignore:
+      - '**.md'
+  schedule:
+    - cron: '27 2 * * 1'
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: AnsibleLint
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: List contents
+      run: pwd && ls -al
+
+    # Get the ansible lint action
+    - name: Use ansible lint action
+      uses: ansible/ansible-lint@v25.2.1
+      with:
+        args: ""
+        setup_python: "true"
+        working_directory: ""
+        requirements_file: "requirements.yml"

@@ -1,0 +1,12 @@
+{
+  "first-line-h1": false,
+  "no-space-in-links": false,
+  "line_length": false,
+  "no-multiple-blanks": false,
+  "no-inline-html": {
+      "allowed_elements": [
+        "details",
+        "summary"
+      ]
+  }
+}

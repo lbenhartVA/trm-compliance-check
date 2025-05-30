@@ -1,0 +1,86 @@
+name: "CodeQL Analyze"
+
+on:
+  push:
+    branches-ignore:
+      - 'gh_pages'
+    tags-ignore:
+      - '*.*' # We don't want this to run on release
+    paths-ignore:
+      - '**.md'
+  pull_request:
+    # The branches below must be a subset of the branches above
+    branches: [ develop ]
+    paths-ignore:
+      - '**/*.md'
+      - '**/*.txt'
+  schedule:
+    - cron: 13 0 * * 0
+  workflow_dispatch:
+
+jobs:
+  analyze:
+    name: Analyze
+    runs-on: ubuntu-latest
+    concurrency: ${{ github.workflow }}-${{ matrix.language }}-${{ github.ref }}
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: 'python'
+            experimental: false
+    continue-on-error: ${{ matrix.experimental }}
+    outputs:
+      selected_language: ${{ matrix.language }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install dependencies
+        run: |
+          export AWS_CDK_VERSION="2.179.0"
+          python -m pip install --upgrade pip
+          pip install pylint
+          pip install -r scripts/python/requirements.txt
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        id: analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: '/language:${{ matrix.language }}'
+
+      - name: Generate CSV
+        uses: department-of-veterans-affairs/codeql-tools/generate-csv@main
+        with:
+          sarif: '${{ steps.analysis.outputs.sarif-output }}/${{ matrix.language }}.sarif'
+          output_path: '${{ runner.temp }}/codeql-scan-results-${{ matrix.language }}.csv'
+
+      - name: Upload CodeQL Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: 'codeql-scan-results-${{ matrix.language }}'
+          path: '${{ runner.temp }}/codeql-scan-results-${{ matrix.language }}.csv'
+
+  verify:
+    name: verify
+    needs: analyze
+    uses: ./.github/workflows/verification-template.yml
+    with:
+      language: ${{ needs.analyze.outputs.selected_language }}

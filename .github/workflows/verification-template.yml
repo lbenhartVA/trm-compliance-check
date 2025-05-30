@@ -1,0 +1,147 @@
+name: "CodeQL Verification"
+on:
+  workflow_call:
+    inputs:
+      language:
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: write
+
+env:
+  file_path: codeql-scan-results-${{ inputs.language }}.csv/codeql-scan-results-${{ inputs.language }}.csv
+jobs:
+  codeql_verify:
+    name: Verify Code
+    runs-on: ubuntu-latest
+    concurrency: ${{ github.workflow }}-${{ inputs.language }}-${{ github.ref }}
+    permissions:
+      actions: write
+      contents: write
+      security-events: write
+      pull-requests: write
+    steps:
+      - name: Download csv file
+        uses: actions/download-artifact@v4
+        with:
+          name: codeql-scan-results-${{ inputs.language }}
+          path: ${{ runner.temp }}/codeql-scan-results-${{ inputs.language }}.csv
+
+      - name: Echo field number for severity
+        id: what_is_field_severity
+        if: always()
+        run: |
+          echo SEV_COL=$(awk -v RS=',' '/severity/{print NR; exit}' ${{ runner.temp }}/${{ env.file_path }})  >> $GITHUB_ENV
+
+      - name: Get Critical count
+        id: critical_codeql_count
+        if: always()
+        run: |
+          critical_count=$( sudo cat ${{ runner.temp }}/${{ env.file_path }} |  awk -F',' 'tolower($SEV_COL) ~ /critical/ { count++ } END { print count }')
+          if [ -z ${critical_count} ]; then
+            critical_count=0
+          fi
+          echo "critical_count=${critical_count}" >> $GITHUB_ENV
+
+      - name: Get High count
+        id: high_codeql_count
+        if: always()
+        run: |
+          high_count=$( sudo cat ${{ runner.temp }}/${{ env.file_path }} |  awk -F',' 'tolower($SEV_COL) ~ /high/ { count++ } END { print count }')
+          if [ -z ${high_count} ]; then
+            high_count=0
+          fi
+          echo "high_count=${high_count}" >> $GITHUB_ENV
+
+      - name: Get Error count
+        id: error_codeql_count
+        if: always()
+        run: |
+          error_count=$( sudo cat ${{ runner.temp }}/${{ env.file_path }} |  awk -F',' 'tolower($SEV_COL) ~ /error/ { count++ } END { print count }')
+          if [ -z ${error_count} ]; then
+            error_count=0
+          fi
+          echo "error_count=${error_count}" >> $GITHUB_ENV
+
+      - name: Get Warning count
+        id: warning_codeql_count
+        if: always()
+        run: |
+          warning_count=$( sudo cat ${{ runner.temp }}/${{ env.file_path }} | awk -F'","' 'tolower($SEV_COL) ~ /warning/ { count++ } END { print count }')
+          if [ -z ${warning_count} ]; then
+            warning_count=0
+          fi
+          echo "warning_count=${warning_count}" >> $GITHUB_ENV
+
+      - name: Fail if any CRITICAL
+        if: always()
+        run: |
+          if [ $critical_count -gt 0 ]; then
+            echo "Total Critical Error Count - $critical_count . For more reference see ${{ env.file_path }}"
+            echo "FAILED=true" >> $GITHUB_ENV
+            exit ${critical_count}
+          fi
+
+      - name: Fail if any HIGH
+        if: always()
+        run: |
+          if [ $high_count -gt 0 ]; then
+            echo "Total High Error count - $high_count . For more reference see ${{ env.file_path }}"
+            echo "FAILED=true" >> $GITHUB_ENV
+            exit ${high_count}
+          fi
+
+      - name: Fail if any ERRORS
+        if: always()
+        run: |
+          if [ $error_count -gt 0 ]; then
+            echo "Total Error count - $error_count . For more reference see ${{ env.file_path }}"
+            exit ${error_count}
+          fi
+
+      - name: Set Branch
+        id: get_branch
+        if: always()
+        run: |
+          if ${{ github.event_name == 'pull_request' }}
+          then
+            echo "BRANCH_NAME=${GITHUB_HEAD_REF}" >> $GITHUB_ENV
+          else
+            echo "BRANCH_NAME=${GITHUB_REF##*/}" >> $GITHUB_ENV
+          fi
+
+      - name: Set Failure for PR
+        id: set_failure
+        if: always()
+        run: |
+          if [ $github.env.FAILED ]; then
+            echo "Code QL has fail for either critical ($critical_count) or high ($high_count) issues"
+            exitcode=$(($critical_count+$high_count))
+            exit ${exitcode}
+          fi
+
+      - name: Comment PR
+        uses: mshick/add-pr-comment@v2
+        if: ${{ github.event_name == 'pull_request' && failure() }}
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          message: |
+            **Pull request failed CodeQL
+            CodeQL Verification Summary for ${{ github.repository }} branch ${{ env.BRANCH_NAME }}
+            echo "critical_count=${{ env.critical_count }}"
+            echo "high_count=${{ env.high_count }}"
+            echo "error_count=${{ env.error_count }}"
+            echo "warning_count=${{ env.warning_count }}"
+          allow-repeats: true
+
+      - name: Verification Summary for ${{ github.repository }} branch ${{ env.BRANCH_NAME }}
+        if: always()
+        run: |
+          echo "CodeQL Verification Summary for ${{ github.repository }} branch ${{ env.BRANCH_NAME }}"
+          echo "critical_count=${{ env.critical_count }}"
+          echo "high_count=${{ env.high_count }}"
+          echo "error_count=${{ env.error_count }}"
+          echo "warning_count=${{ env.warning_count }}"
+

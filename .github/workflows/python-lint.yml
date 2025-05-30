@@ -1,0 +1,96 @@
+name: "Python Lint"
+
+on:
+  push:
+    branches-ignore:
+      - 'master'
+      - 'gh_pages'
+  pull_request:
+    # The branches below must be a subset of the branches above
+    branches: [ master, develop,'Release-*' ]
+    paths-ignore:
+      - '**.md'
+  schedule:
+    - cron: '27 2 * * 1'
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+env:
+  AVG_THRESHOLD: 9
+  MIN_THRESHOLD: 8
+
+jobs:
+  pythonLint:
+    name: Python Lint
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+
+    - name: Install dependencies
+      run: |
+        export AWS_CDK_VERSION="2.179.0"
+        python -m pip install --upgrade pip
+        pip install pylint
+        pip install -r scripts/python/requirements.txt
+
+    - name: Analyzing the code with pylint
+      run: |
+        output1=$(find scripts/python -name '*.py' -exec pylint --rcfile scripts/python/.pylintrc --fail-under=${{env.AVG_THRESHOLD}} {} \;)
+        echo $output1 > pylint.log
+      id: run_lint
+
+    - name: Get the average score
+      if: always()
+      run: |
+        avg_score=$(grep -oP 'rated at ([-0-9\.]+)/10[ ]*' pylint.log | sed -re 's_.* ([-0-9\.]+)/10_\1_;t;d;' | awk '{ SUM += $1;count+=1 } END { print SUM/count }')
+        echo "score=${avg_score}" >> $GITHUB_OUTPUT
+        echo ${avg_score}
+        sed -rie 's!(Module app)!\n\1!g' pylint.log
+        sed -rie 's!( README)!\n\1!g' pylint.log
+        sed -rie 's!( scripts\/python)!\n-----\n\1!g' pylint.log
+        sed -rie 's!([CREW][0-9]{4})!\n\1!g' pylint.log
+        sed -rie 's!(\(previous run.*?\/10.*?\))!\n\1\n!g' pylint.log
+        sed -rie 's!( [-]{2,80})(.*?\/10)!\n-----\2-----\n!g' pylint.log
+        cat pylint.log
+      id: average_python_score
+
+    - name: Get the minimum score
+      if: always()
+      run: |
+        min_score=$(grep -oP 'rated at ([-0-9\.]+)/10[ ]*' pylint.log | sed -re 's_.* ([-0-9\.]+)/10_\1_;t;d;' | awk ' NR == 1 {val=$1; min=$1} NR > 1 && $1 < min {val=$1; min=$1} END {print min}')
+        echo "score=${min_score}" >> $GITHUB_OUTPUT
+        echo ${min_score}
+        cat pylint.log
+      id: min_python_score
+
+    - name: Get the error count
+      if: always()
+      run: |
+        errors=$(grep -oP 'E([0-9]{4})' pylint.log | wc -l)
+        echo "errors_found=${errors}" >> $GITHUB_OUTPUT
+        echo ${errors}
+        cat pylint.log
+        rm pylint.log
+      id: python_errors
+
+    - name: Fail if any errors
+      run: |
+        awk "BEGIN{exit (${{ steps.python_errors.outputs.errors_found }} > 0 ? ${{ steps.python_errors.outputs.errors_found }} : 0)}"
+
+    - name: Fail if min score is less than theshold
+      run: |
+        awk "BEGIN{exit (${{ steps.min_python_score.outputs.score }} < ${{ env.MIN_THRESHOLD }} ? 1 : 0)}"
+
+    - name: Fail if average score is less than theshold
+      run: |
+        awk "BEGIN{exit (${{ steps.average_python_score.outputs.score }} < ${{ env.AVG_THRESHOLD }} ? 1 : 0)}"

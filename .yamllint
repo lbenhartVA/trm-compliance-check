@@ -1,0 +1,25 @@
+---
+extends: default
+
+rules:
+  # Disabling to allow for code comment blocks
+  document-start: disable
+  empty-lines:
+    max-end: 1
+  # Disabling due to copious amounts of long lines in the code
+  line-length: disable
+  truthy:
+    allowed-values: ['true', 'false', 'yes', 'no', 'True', 'False']
+  braces:
+    forbid: false
+    min-spaces-inside: 0
+    max-spaces-inside: 1
+    min-spaces-inside-empty: -1
+    max-spaces-inside-empty: -1
+  comments:
+    require-starting-space: False
+    min-spaces-from-content: 1
+  octal-values:
+    forbid-implicit-octal: true
+    forbid-explicit-octal: true
+  comments-indentation: false

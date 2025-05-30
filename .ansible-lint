@@ -1,0 +1,121 @@
+---
+# .ansible-lint
+# exclude_paths included in this file are parsed relative to this file's location
+# and not relative to the CWD of execution. CLI arguments passed to the --exclude
+# option will be parsed relative to the CWD of execution.
+exclude_paths:
+  - .cache/  # implicit unless exclude_paths is defined in config
+  - .github/
+  - roles/
+
+parseable: true
+# quiet: true
+# verbosity: 1
+
+# Mock modules or roles in order to pass ansible-playbook --syntax-check
+mock_modules:
+  # - zuul_return
+  # note the foo.bar is invalid as being neither a module or a collection
+  # - fake_namespace.fake_collection.fake_module
+  # - fake_namespace.fake_collection.fake_module.fake_submodule
+  - synchronize
+  - mail
+  - community.general.sefcontext
+  - community.general.archive
+  - amazon.aws.aws_caller_info
+  - community.general.mssql_script
+  - community.general.mail
+  - community.aws.elb_target_group
+  - community.crypto.x509_certificate_info
+  - community.general.ansible_galaxy_install
+
+mock_roles:
+  # - mocked_role
+  # - author.role_name  # old standalone galaxy role
+  # - fake_namespace.fake_collection.fake_role  # role within a collection
+
+# Enable checking of loop variable prefixes in roles
+# loop_var_prefix: "{role}_"
+
+# Enforce variable names to follow pattern below, in addition to Ansible own
+# requirements, like avoiding python identifiers. To disable add `var-naming`
+# to skip_list.
+# var_naming_pattern: "^[a-z_][a-z0-9_]*$"
+
+use_default_rules: true
+# Load custom rules from this specific folder
+# rulesdir:
+#   - ./rule/directory/
+
+# This makes linter to fully ignore rules/tags listed below
+skip_list:
+  - skip_this_tag
+  - no-relative-paths  # skip this rule, we use relative paths
+  - role-name  # Role name {} does not match ``^[a-z][a-z0-9_]+$`` pattern
+  - no-changed-when  # Commands should not change things if nothing needs doing
+  - fqcn-builtins
+  - var-naming
+  - internal-error  # Unexpected internal error
+  # Allow Jinja templating inside task and play names
+  - name[template]
+  # We use camelCase for naming, this is ok for us
+  - name[casing]
+  # do not require FQCN for builtin actions
+  - fqcn[action]
+  - args[module]
+  - yaml  # Violations reported by yamllint.
+  - schema[vars]
+  - run_once[task]
+
+# Any rule that has the 'opt-in' tag will not be loaded unless its 'id' is
+# mentioned in the enable_list:
+enable_list:
+  - no-same-owner
+  # add yaml here if you want to avoid ignoring yaml checks when yamllint
+  # library is missing. Normally its absence just skips using that rule.
+# Report only a subset of tags and fully ignore any others
+# tags:
+#   - var-spacing
+
+# This makes the linter display but not fail for rules/tags listed below:
+warn_list:
+  - skip_this_tag
+  - git-latest
+  - experimental  # experimental is included in the implicit list
+  - risky-file-permissions  # we can make judgements regarding file permissions
+  - package-latest
+  - run_once[task]
+  - jinja[spacing]
+
+# Some rules can transform files to fix (or make it easier to fix) identified
+# errors. `ansible-lint --write` will reformat YAML files and run these transforms.
+# By default it will run all transforms (effectively `write_list: ["all"]`).
+# You can disable running transforms by setting `write_list: ["none"]`.
+# Or only enable a subset of rule transforms by listing rules/tags here.
+# write_list:
+#   - all
+
+# Offline mode disables installation of requirements.yml
+offline: true
+
+# Define required Ansible's variables to satisfy syntax check
+extra_vars:
+  var_hosts: bar
+# multiline_string_variable: |
+# line1
+# line2
+# complex_variable: ":{;\t$()"
+
+# Uncomment to enforce action validation with tasks, usually is not
+# needed as Ansible syntax check also covers it.
+# skip_action_validation: false
+
+# List of additional kind:pattern to be added at the top of the default
+# match list, first match determines the file kind.
+kinds:
+  # - playbook: "**/playbooks/*.{yml,yaml}"
+  # - galaxy: "**/folder/galaxy.yml"
+  # - tasks: "**/tasks/*.yml"
+  # - vars: "**/vars/*.yml"
+  # - meta: "**/meta/main.yml"
+  - yaml: "**/environments/**/all/*.*"
