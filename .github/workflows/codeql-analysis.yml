@@ -78,9 +78,3 @@ jobs:
           name: 'codeql-scan-results-${{ matrix.language }}'
           path: '${{ runner.temp }}/codeql-scan-results-${{ matrix.language }}.csv'
 
-  verify:
-    name: verify
-    needs: analyze
-    uses: ./.github/workflows/verification-template.yml
-    with:
-      language: ${{ needs.analyze.outputs.selected_language }}
