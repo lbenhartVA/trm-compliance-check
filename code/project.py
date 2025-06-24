@@ -4,7 +4,6 @@ from selenium.webdriver.edge.options import Options
 from selenium.webdriver.common.by import By
 import json
 import time
-import os
 
 def fetch_data(tid):  
   url = f"https://www.oit.va.gov/Services/TRM/ToolPage.aspx?tid={tid}&tab2"
@@ -15,14 +14,11 @@ def fetch_data(tid):
   try:
      driver = webdriver.Edge(service=Service(path), options=options)
      driver.get(url)
-     time.sleep(3)
-
+     time.sleep(15)
+       
      entry = {
-          "name": driver.find_element(By.ID, "ContentPlaceHolder1_hdnToolName").text, 
-          "tid": int(driver.find_element(By.ID, "ContentPlaceHolder1_hdnToolID").text), 
-          "decision": driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_hdnDecision").text,
-          "version": driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_hdnVersion").text, 
-          "approval_date": driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_hdnDecisionDate").text
+          "name": driver.title.strip(), 
+          "tid": driver.find_element(By.ID, "ContentPlaceHolder1_hdnToolId").get_attribute("value")
           }
      return {
      "trm_base_url": url.split("?")[0],
