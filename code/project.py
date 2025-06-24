@@ -15,10 +15,12 @@ def fetch_data(tid):
      driver = webdriver.Edge(service=Service(path), options=options)
      driver.get(url)
      time.sleep(15)
-       
+     label = driver.find_element(By.XPATH, "//td[text()='Decision Date:']")
+     value = label.find_element(By.XPATH, "following-sibling::td")
      entry = {
           "name": driver.title.strip(), 
-          "tid": driver.find_element(By.ID, "ContentPlaceHolder1_hdnToolId").get_attribute("value")
+          "tid": driver.find_element(By.ID, "ContentPlaceHolder1_hdnToolId").get_attribute("value"),
+          "approval_date": value.text.split(" ")[0]
           }
      return {
      "trm_base_url": url.split("?")[0],
@@ -28,5 +30,5 @@ def fetch_data(tid):
      driver.quit()
 
 if __name__ == "__main__":
-    result = fetch_data(6367)
+    result = fetch_data(13552)
     print(json.dumps(result, indent=2))
