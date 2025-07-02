@@ -1,24 +1,74 @@
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 import json
-import time
 from datetime import datetime
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import WebDriverException, SessionNotCreatedException, TimeoutException, StaleElementReferenceException, NoSuchElementException
 
+#Uses datetime to get the current year and quarter
 def get_current_quarter():
    now = datetime.now()
    current_year = now.year
    current_quarter = f"Q{(now.month - 1) // 3 + 1}"
    return current_year, current_quarter
 
+def get_current_decision(table, version):
+  #Gets the current quarter and assigns them to variables
+  curr_year, curr_quarter = get_current_quarter()
+  target_header = f"CY{curr_year} {curr_quarter}"
+  
+  #Gets the two header rows and assigns them to variables
+  rows = table.find_elements(By.TAG_NAME, "tr")
+  year_row = rows[0].find_elements(By.TAG_NAME, "th")
+  quarter_row = rows[1].find_elements(By.TAG_NAME, "th")
+
+  # expands the year row to have the same amount of space as the quarter row
+  expanded_years = []
+  for cell in year_row:
+        text = cell.text.strip()
+        colspan = int(cell.get_attribute("colspan") or 1)
+        expanded_years.extend([text] * colspan)
+
+  # Builds full column labels like "CY2025 Q3"
+  header_labels = []
+  for year, quarter_cell in zip(expanded_years, quarter_row):
+        quarter = quarter_cell.text.strip()
+        full_label = f"{year} {quarter}"
+        header_labels.append(full_label)
+  #Gets the index of the current year and quarter
+  try:
+     col_index = header_labels.index(target_header)
+  except ValueError:
+        print(f"Could not find column for {target_header}")
+        return None
+  #Skips the two header rows and finds the row that has the same version as the one inputed.
+  #Then it gets the text from the cell a column index away and gets the text which is the decision
+  for row in rows[2:]:  
+        cells = row.find_elements(By.TAG_NAME, "td")
+        if not cells:
+            continue
+        row_version = cells[0].text.strip()
+        if row_version == version:
+            if col_index < len(cells):
+                return cells[col_index].text.strip()
+            else:
+                print(f"Column index {col_index} out of range for version row '{row_version}'")
+                return None
+# Just a checker in case an invaild verision was inputed
+  print(f"Version '{version}' not found in matrix")
+  return None
+
+#Collects all the data into one entry and outputs said entry
 def fetch_data(tid, version):  
-  url = f"https://www.oit.va.gov/Services/TRM/ToolPage.aspx?tid={tid}&tab2"
+
+  #Gets the url of any software on the trm compliance using the tid
+  url = f"https://www.oit.va.gov/Services/TRM/ToolPage.aspx?tid={tid}&tab=2"
   
 
   try:
+    #Opens a Chrome Browser with the set url
     chrome_options = Options()
     chrome_options.accept_insecure_certs = True
     driver = webdriver.Chrome(options=chrome_options)
@@ -26,6 +76,7 @@ def fetch_data(tid, version):
     WebDriverWait(driver, 15).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, "table:nth-of-type(4)"))
         )
+  #Runs all the expections that could cause the Chrome Browers to fail
   except ConnectionError as e:
     print("Connection error occurred:")
     print(e)
@@ -44,25 +95,21 @@ def fetch_data(tid, version):
     return
 
   try:
-     
+     #loads th decision table of the website
      table = driver.find_element(By.CSS_SELECTOR, "table:nth-of-type(4)")
-     rows = table.find_elements(By.CSS_SELECTOR, "tbody tr")
-     decision_date_path = driver.find_element(By.XPATH, "//td[text()='Decision Date:']")
-     decision_date = decision_date_path.find_element(By.XPATH, "following-sibling::td")
-     decision = None
      
+     #All the data needed is stored in this array
      entry = {
           "URL": url,
           "Name": driver.title.strip(), 
-          "Tid": driver.find_element(By.ID, "ContentPlaceHolder1_hdnToolId").get_attribute("value"),
           "Version": version,
-          "Decision": decision,
-          "Decision_Date": decision_date.text.split(" ")[0]
+          "Decision": get_current_decision(table, version),
           }
      return {
      "trm_base_url": url.split("?")[0],
      "trm_entries":[entry]
      }
+  #Runs all the expections that could cause the required elements not to be obtained
   except NoSuchElementException as e:
     print("Couldn't locate a required element on the page:")
     print(e)
@@ -75,6 +122,7 @@ def fetch_data(tid, version):
   finally:
      driver.quit()
 
+#Runs the code with a certain tid and version for testing
 if __name__ == "__main__":
-    result = fetch_data(6367, "8.x")
+    result = fetch_data(6367, "4.x")
     print(json.dumps(result, indent=2))
