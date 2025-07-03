@@ -1,6 +1,6 @@
 ---
 # Payer TRM Entries
-trm_base_url: https://trm.oit.va.gov/ToolPage.aspx
+trm_base_url: https://www.oit.va.gov/Services/TRM/ToolPage.aspx
 
 trm_entries:
   - name: Red Hat Enterprise Linux (RHEL)
