@@ -1,5 +1,3 @@
-pip install selenium
-
-pip instal web-manager
-
-pip install pyyaml
+selenium
+web-manager
+pyyaml
