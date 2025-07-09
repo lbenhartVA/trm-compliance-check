@@ -1,5 +1,8 @@
 from selenium import webdriver
 import logging
+import os
+import smtplib
+from email.message import EmailMessage
 from selenium.webdriver.common.by import By
 import json
 from datetime import datetime
@@ -10,6 +13,34 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import WebDriverException, SessionNotCreatedException, TimeoutException, StaleElementReferenceException, NoSuchElementException
+
+#Defining the variable used in email_report
+SMTP_SERVER = "smtp.gmail.com"
+SMTP_PORT = 587
+SENDER_EMAIL = os.getenv("TRM_EMAIL_SENDER")
+SENDER_PASSWORD = os.getenv("TRM_EMAIL_PASSWORD")
+RECIPIENTS = ["abi06naod04@gmail.com", "naod5180@gmail.com"]
+
+#A helper function to send an email of the report
+def email_report(subject, body, recipients, attachment_data=None, attachment_filename="trm_report.json"):
+   email = EmailMessage()
+   email["Subject"] = subject
+   email["From"] = SENDER_EMAIL
+   email["To"] = ", ".join(recipients)
+   email.set_content(body)
+
+   if attachment_data:
+      email.add_attachment(attachment_data.encode("utf-8"),
+            maintype="application",
+            subtype="json",
+            filename=attachment_filename)
+   try:
+      with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+         server.starttls()
+         server.login(SENDER_EMAIL, SENDER_PASSWORD)
+         server.send_message(email)
+   except Exception as e:
+      logging.error("Failed to send email: %s", e)
 
 #Uses datetime to get the current year and quarter
 def get_current_quarter():
@@ -42,13 +73,13 @@ def get_current_decision(driver, version, curr_year=None, curr_quarter=None):
 
     if len(rows) < 2:
        logging.warning("Table does not have enough header rows.")
-       return "Unapproved(Decision Not Found)"
+       return "Decision Not Found"
     
     #finds how far our target header is in the map
     col_index = QUARTER_MAP.get(target_header)
     if col_index is None:
         logging.warning(f"Couldn't find column for {target_header}")
-        return "Unapproved(Decision Not Found)"
+        return "Decision Not Found"
     col_index += 1
 
     # Search for the version row
@@ -62,10 +93,10 @@ def get_current_decision(driver, version, curr_year=None, curr_quarter=None):
            return cells[col_index].text.strip()
           else:
            logging.warning(f"Column index {col_index} out of range for version row '{row_version}'")
-           return "Unapproved(Decision Not Found)"
+           return "Decision Not Found"
 
     logging.warning(f"Version '{version}' not found in matrix")
-    return "Unapproved (Decision Not Found)"
+    return "Decision Not Found"
 
 
 #Collects all the data into one entry and outputs said entry
@@ -93,16 +124,16 @@ def fetch_data(driver, url, version):
   try:
      #Obtains the decision of the given version
      cur_year, cur_quarter = get_current_quarter()
-     decsion = get_current_decision(driver, version, cur_year, cur_quarter)
-
+     decision = get_current_decision(driver, version, cur_year, cur_quarter)
+     clean_decision = decision.replace("\n", " ")
      #All the data needed is stored in this entry
      entry = {
-          "Entry Number": 1,
           "URL": url,
           "Name": driver.title.strip(),
           "Tid": driver.find_element(By.ID, "ContentPlaceHolder1_hdnToolId").get_attribute("value"), 
           "Version": version,
-          "Decision": decsion,
+          "Decision": clean_decision,
+          "Status": "",
           "Decision Date": "None"
           }
      return entry
@@ -132,6 +163,17 @@ def is_url_valid(url, timeout=5):
         logging.warning("URL check failed for %s: %s", url, e)
         return False
 
+def check_decision_status(decision1, version1, decision2, version2):
+   if decision1 == decision2 and version1 == version2:
+      if "DIVEST" in decision2:
+         return "InDivest"
+      else:
+         return "InCompliance"
+   elif decision1 != decision2 and version1 == version2:
+      return f"Decision Mismatch (Was: {decision1} Now: {decision2})"
+   else:
+      return "Unapproved"
+   
 #Runs the code with a certain tid and version for testing
 if __name__ == "__main__":
     
@@ -151,7 +193,7 @@ if __name__ == "__main__":
     with open(yaml_path, 'r') as file:
       data = yaml.safe_load(file)
       base_url = data.get("trm_base_url", "")
-      input_data = [(entry["tid"], entry["version"], entry["name"]) for entry in data.get("trm_entries", [])]
+      input_data = [(entry["tid"], entry["version"], entry["name"], entry["decision"]) for entry in data.get("trm_entries", [])]
 
     #The structure to build the json report
     report = {
@@ -163,27 +205,27 @@ if __name__ == "__main__":
 
     #Iterates through each entry and runs fetch data on the valid entries
     try:
-      for tid, version, name in input_data:
+      for tid, version, name, decision in input_data:
         try:
           url = f"{base_url}?tid={tid}&tab=2"
           if not is_url_valid(url):
             logging.warning("Skipping invalid or unreachable URL: %s", url)
             result = {
-            "Entry Number": counter,
             "URL": "Invalid",
             "Name": name,
             "Tid": tid,
             "Version": version,
-            "Decision": "Unapproved (Invaild Link)",
+            "Decision": "Decision Not Found(Invaild Link)",
+            "Status": "Unapproved",
             "Decision Date": "None"
-           }
+            }
             report["trm_entries"].append(result)
             continue
 
           result = fetch_data(driver, url, version)
           if result:
              counter += 1
-             result["Entry Number"] = counter 
+             result["Status"] = check_decision_status(decision, version, result["Decision"], result["Version"])
              report["trm_entries"].append(result)
              print("Processed", counter, "entries")
         except Exception as e:
@@ -192,4 +234,7 @@ if __name__ == "__main__":
             driver.quit()
 
     #Prints out the full report        
-    print(json.dumps(report, indent=2))
+    json_report = json.dumps(report, indent=2)
+    print(json_report)
+    #email_report(subject="TRM Scrap Report", body="Attached is the results of the latest trm-compliance scan", recipients= RECIPIENTS, attachment_data=json_report)
+    print("email sent")
