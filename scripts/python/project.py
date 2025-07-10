@@ -15,17 +15,15 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import WebDriverException, SessionNotCreatedException, TimeoutException, StaleElementReferenceException, NoSuchElementException
 
 #Defining the variable used in email_report
-SMTP_SERVER = "smtp.gmail.com"
+SMTP_SERVER = "smtp.office365.com"
 SMTP_PORT = 587
-SENDER_EMAIL = os.getenv("TRM_EMAIL_SENDER")
-SENDER_PASSWORD = os.getenv("TRM_EMAIL_PASSWORD")
-RECIPIENTS = ["abi06naod04@gmail.com", "naod5180@gmail.com"]
+RECIPIENTS = ["Lee.Benhart@saic.com"]
 
-#A helper function to send an email of the report
+#A helper function to send an email of the report (Not being used right now due to complications)
 def email_report(subject, body, recipients, attachment_data=None, attachment_filename="trm_report.json"):
    email = EmailMessage()
    email["Subject"] = subject
-   email["From"] = SENDER_EMAIL
+   email["From"] = "Naod.Abraham@saic.com"
    email["To"] = ", ".join(recipients)
    email.set_content(body)
 
@@ -37,8 +35,8 @@ def email_report(subject, body, recipients, attachment_data=None, attachment_fil
    try:
       with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
          server.starttls()
-         server.login(SENDER_EMAIL, SENDER_PASSWORD)
          server.send_message(email)
+         server.quit()
    except Exception as e:
       logging.error("Failed to send email: %s", e)
 
@@ -98,7 +96,6 @@ def get_current_decision(driver, version, curr_year=None, curr_quarter=None):
     logging.warning(f"Version '{version}' not found in matrix")
     return "Decision Not Found"
 
-
 #Collects all the data into one entry and outputs said entry
 def fetch_data(driver, url, version):  
   try:
@@ -106,7 +103,7 @@ def fetch_data(driver, url, version):
     WebDriverWait(driver, 15).until(
             EC.presence_of_element_located((By.XPATH, "//table[.//th[contains(text(), 'CY')]]"))
         )
-    
+
   #Runs all the expections that could cause the Chrome Browers to fail
   except ConnectionError as e:
     logging.error("Connection error occurred:", e)
@@ -126,6 +123,7 @@ def fetch_data(driver, url, version):
      cur_year, cur_quarter = get_current_quarter()
      decision = get_current_decision(driver, version, cur_year, cur_quarter)
      clean_decision = decision.replace("\n", " ")
+
      #All the data needed is stored in this entry
      entry = {
           "URL": url,
@@ -134,7 +132,7 @@ def fetch_data(driver, url, version):
           "Version": version,
           "Decision": clean_decision,
           "Status": "",
-          "Decision Date": "None"
+          "Decision Date": " "
           }
      return entry
   
@@ -164,11 +162,12 @@ def is_url_valid(url, timeout=5):
         return False
 
 def check_decision_status(decision1, version1, decision2, version2):
-   if decision1 == decision2 and version1 == version2:
-      if "DIVEST" in decision2:
-         return "InDivest"
-      else:
-         return "InCompliance"
+   if "DIVEST" in decision2:
+      return "InDivest"
+   elif not decision1 or not version1 or  not decision2 or not version2:
+       return "Unapproved"
+   elif decision1 == decision2 and version1 == version2:
+      return "InCompliance"
    elif decision1 != decision2 and version1 == version2:
       return f"Decision Mismatch (Was: {decision1} Now: {decision2})"
    else:
@@ -235,6 +234,11 @@ if __name__ == "__main__":
 
     #Prints out the full report        
     json_report = json.dumps(report, indent=2)
-    print(json_report)
+    with open("trm_report.json", "w") as file:
+      file.write(json_report)
+      file.close
+    with open("trm_report.html", "w") as file2:
+      file2.write(json_report)
+      file2.close()
     #email_report(subject="TRM Scrap Report", body="Attached is the results of the latest trm-compliance scan", recipients= RECIPIENTS, attachment_data=json_report)
-    print("email sent")
+    
