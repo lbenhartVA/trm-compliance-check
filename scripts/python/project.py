@@ -1,6 +1,6 @@
 from selenium import webdriver
 import logging
-import os
+from concurrent.futures import ThreadPoolExecutor
 import smtplib
 from email.message import EmailMessage
 from selenium.webdriver.common.by import By
@@ -173,9 +173,26 @@ def check_decision_status(decision1, version1, decision2, version2):
    else:
       return "Unapproved"
    
+def process_entry(driver, base_url, tid, version, name, decision):
+    url = f"{base_url}?tid={tid}&tab=2"
+    if not is_url_valid(url):
+        return {
+            "URL": "Invalid",
+            "Name": name,
+            "Tid": tid,
+            "Version": version,
+            "Decision": "Decision Not Found(Invalid Link)",
+            "Status": "Unapproved",
+            "Decision Date": "None"
+        }
+
+    result = fetch_data(driver, url, version)
+    if result:
+        result["Status"] = check_decision_status(decision, version, result["Decision"], result["Version"])
+        return result
+    return None
 #Runs the code with a certain tid and version for testing
 if __name__ == "__main__":
-    
     #Opens a headless Chrome Browser
     chrome_options = Options()
     chrome_options.add_argument("--headless") 
@@ -206,27 +223,8 @@ if __name__ == "__main__":
     try:
       for tid, version, name, decision in input_data:
         try:
-          url = f"{base_url}?tid={tid}&tab=2"
-          if not is_url_valid(url):
-            logging.warning("Skipping invalid or unreachable URL: %s", url)
-            result = {
-            "URL": "Invalid",
-            "Name": name,
-            "Tid": tid,
-            "Version": version,
-            "Decision": "Decision Not Found(Invaild Link)",
-            "Status": "Unapproved",
-            "Decision Date": "None"
-            }
-            report["trm_entries"].append(result)
-            continue
-
-          result = fetch_data(driver, url, version)
-          if result:
-             counter += 1
-             result["Status"] = check_decision_status(decision, version, result["Decision"], result["Version"])
-             report["trm_entries"].append(result)
-             print("Processed", counter, "entries")
+          result = process_entry(driver, base_url, tid, version, name, decision)
+          report["trm_entries"].append(result)
         except Exception as e:
            logging.error(f"Error processing TID {tid} with version {version}: {e}")
     finally:

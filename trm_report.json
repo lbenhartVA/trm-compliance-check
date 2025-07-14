@@ -16,7 +16,7 @@
       "Tid": "35",
       "Version": "2019",
       "Decision": "",
-      "Status": "Decision Mismatch (Was: Authorized w/ Constraints (DIVEST) [25, 33, 34, 35, 36, 37] Now: )",
+      "Status": "Unapproved",
       "Decision Date": " "
     },
     {
@@ -34,7 +34,7 @@
       "Tid": "8196",
       "Version": "2.16.x",
       "Decision": "Authorized w/ Constraints (DIVEST) [14, 15, 16, 19, 20, 21, 23]",
-      "Status": "Decision Mismatch (Was: Authorized w/ Constraints [15, 16, 17, 20, 21, 22, 23] Now: Authorized w/ Constraints (DIVEST) [14, 15, 16, 19, 20, 21, 23])",
+      "Status": "InDivest",
       "Decision Date": " "
     },
     {
@@ -60,7 +60,7 @@
       "Name": "EnCase Agent",
       "Tid": 10758,
       "Version": "24.x",
-      "Decision": "Decision Not Found(Invaild Link)",
+      "Decision": "Decision Not Found(Invalid Link)",
       "Status": "Unapproved",
       "Decision Date": "None"
     },

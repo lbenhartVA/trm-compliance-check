@@ -1,3 +1,4 @@
 selenium
 web-manager
 pyyaml
+coverage
