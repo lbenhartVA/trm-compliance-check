@@ -1,10 +1,10 @@
 import unittest
 from unittest.mock import MagicMock, mock_open, patch
-import yaml
 import json
+import yaml
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
-from selenium.common.exceptions import TimeoutException, SessionNotCreatedException, WebDriverException
+from selenium.common.exceptions import TimeoutException, WebDriverException
 
 from project import check_decision_status
 from project import generate_quarter_map
@@ -126,7 +126,6 @@ class TestSeleniumFunctions(unittest.TestCase):
     decision = get_current_decision(driver, version="Win 10.x", curr_year=2025, curr_quarter="Q2")
     self.assertTrue(decision == "Decision Not Found")
 
-    
 
   def test_vaild_entry(self):
     url = "https://www.oit.va.gov/Services/TRM/ToolPage.aspx?tid=9952&tab=2"
@@ -146,7 +145,6 @@ class TestSeleniumFunctions(unittest.TestCase):
     self.assertTrue(entry["Decision"] == "Decision Not Found")
     
 class TestFetchDataExceptions(unittest.TestCase):
-
   @patch("project.logging.error")
   @patch("project.WebDriverWait")
   def test_timeout_exception(self, mock_wait, mock_log):
@@ -157,7 +155,7 @@ class TestFetchDataExceptions(unittest.TestCase):
 
        
   @patch("project.WebDriverWait")
-  @patch("project.logging.error") 
+  @patch("project.logging.error")
   def test_connection_error(self, mock_log, mock_wait):
     mock_driver = MagicMock()
     mock_driver.get.side_effect = ConnectionError("Simulated connection error")
