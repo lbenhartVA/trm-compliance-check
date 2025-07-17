@@ -67,6 +67,40 @@ def get_current_decision(driver, version, curr_year=None, curr_quarter=None):
   logging.warning("Version %s not found in matrix", version)
   return "Unapproved (Decision Not Found)"
 
+def get_all_decisions(driver):
+  curr_year, curr_quarter = get_current_quarter()
+  target_header = f"CY{curr_year} {curr_quarter}"
+
+  #Creates the quarter map
+  QUARTER_MAP = generate_quarter_map(curr_year)
+  table = driver.find_element(By.XPATH, "//table[.//th[contains(text(), 'CY')]]")
+  rows = table.find_elements(By.TAG_NAME, "tr")
+
+  if len(rows) < 2:
+    logging.warning("Table does not have enough header rows.")
+    return "Unapproved (Decision Not Found)"
+  #finds how far our target header is in the map
+  col_index = QUARTER_MAP.get(target_header)
+  if col_index is None:
+    logging.warning("Couldn't find column for %s", target_header)
+    return "Unapproved (Decision Not Found)"
+  col_index += 1
+  version_map = []
+
+  # Search for the version row
+  for row in rows[2:]:
+    cells = row.find_elements(By.TAG_NAME, "td")
+    if not cells:
+      continue
+    row_version = cells[0].text.strip()
+    if col_index < len(cells):
+      if any(char.isdigit() for char in row_version):
+        decision =  cells[col_index].text.strip()
+        version_map.append((row_version, decision))
+    logging.warning("Column index %s out of range for version row %s", col_index, row_version)
+
+  return version_map
+
 def get_decision_date(driver):
   try:
     decision_text = driver.execute_script("return document.body.innerText.match(/Decision Date \\((.*?)\\)/)?.[1] || 'Unknown';")
@@ -126,6 +160,8 @@ def fetch_data(driver, url, version):
     logging.error("Failed to obtain elements: %s", e)
     return None
   
+
+  
 #Helper function to check if the url actually has the proper page
 def is_url_valid(url, timeout=5):
   try:
@@ -168,6 +204,7 @@ def process_entry(driver, b_url, tid, version, name, decision):
     }
 
   entry_result = fetch_data(driver, url, version)
+  verisions = get_all_decisions(driver)
   if entry_result is not None:
     entry_result["Status"] = check_decision_status(decision, version, entry_result["Decision"], entry_result["Version"])
     return entry_result
@@ -224,7 +261,7 @@ if __name__ == "__main__":
   template_dir = script_dir / "templates"
 
   env = Environment(loader=FileSystemLoader(template_dir))
-  template = env.get_template("report_template.html")
+  template = env.get_template("report_template.html.j2")
 
   # Render HTML with your report data
   html_output = template.render(trm_entries=report["trm_entries"])
