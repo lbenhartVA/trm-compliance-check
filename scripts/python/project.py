@@ -44,12 +44,12 @@ def get_current_decision(driver, version, curr_year=None, curr_quarter=None):
 
   if len(rows) < 2:
     logging.warning("Table does not have enough header rows.")
-    return "Unapproved (Decision Not Found)"
+    return "Decision Not Found"
   #finds how far our target header is in the map
   col_index = QUARTER_MAP.get(target_header)
   if col_index is None:
     logging.warning("Couldn't find column for %s", target_header)
-    return "Unapproved (Decision Not Found)"
+    return "Decision Not Found"
   col_index += 1
 
   # Search for the version row
@@ -62,10 +62,10 @@ def get_current_decision(driver, version, curr_year=None, curr_quarter=None):
       if col_index < len(cells):
         return cells[col_index].text.strip()
       logging.warning("Column index %s out of range for version row %s", col_index, row_version)
-      return "Unapproved (Decision Not Found)"
+      return "Decision Not Found"
 
   logging.warning("Version %s not found in matrix", version)
-  return "Unapproved (Decision Not Found)"
+  return "Decision Not Found"
 
 def get_all_decisions(driver):
   curr_year, curr_quarter = get_current_quarter()
@@ -78,12 +78,12 @@ def get_all_decisions(driver):
 
   if len(rows) < 2:
     logging.warning("Table does not have enough header rows.")
-    return "Unapproved (Decision Not Found)"
+    return "Decision Not Found"
   #finds how far our target header is in the map
   col_index = QUARTER_MAP.get(target_header)
   if col_index is None:
     logging.warning("Couldn't find column for %s", target_header)
-    return "Unapproved (Decision Not Found)"
+    return "Decision Not Found"
   col_index += 1
   version_map = []
 
@@ -163,7 +163,7 @@ def fetch_data(driver, url, version):
 
   
 #Helper function to check if the url actually has the proper page
-def is_url_valid(url, timeout=5):
+def is_url_valid(url, timeout=10):
   try:
     response = requests.get(url, timeout=timeout)
     if response.status_code != 200:
@@ -204,7 +204,6 @@ def process_entry(driver, b_url, tid, version, name, decision):
     }
 
   entry_result = fetch_data(driver, url, version)
-  verisions = get_all_decisions(driver)
   if entry_result is not None:
     entry_result["Status"] = check_decision_status(decision, version, entry_result["Decision"], entry_result["Version"])
     return entry_result
@@ -236,10 +235,7 @@ if __name__ == "__main__":
   "trm_base_url": base_url,
   "trm_entries": []
 }
-    #Here to keep track of the number of entries
-  counter = 0
-
-    #Iterates through each entry and runs fetch data on the valid entries
+  #Iterates through each entry and runs fetch data on the valid entries
   try:
     for file_tid, file_version, entry_name, file_decision, date in input_data:
       try:
@@ -261,7 +257,7 @@ if __name__ == "__main__":
   template_dir = script_dir / "templates"
 
   env = Environment(loader=FileSystemLoader(template_dir))
-  template = env.get_template("report_template.html.j2")
+  template = env.get_template("report_template.html")
 
   # Render HTML with your report data
   html_output = template.render(trm_entries=report["trm_entries"])

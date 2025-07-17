@@ -46,17 +46,19 @@
     }
 
     .status-indivest {
-      background-color: #fffccf;
+      background-color: #ffe5e5;
     }
 
     .status-unapproved {
       background-color: #ffe5e5;
     }
+
     .status-mismatch {
-      background-color: #e6ffed; /* green unless Decision says "Not Found" */
+      background-color: #fffccf;
     }
+
     .status-mismatch-error {
-      background-color: #f0f0f0; /* red if Decision contains "Not Found" */
+      background-color: #f0f0f0;
     }
 
     /* URL link styling */
@@ -88,24 +90,30 @@
       {% for entry in trm_entries %}
       <tr
         class="{% if entry.Status == 'InCompliance' %}
-            status-authorized
-         {% elif entry.Status == 'InDivest' %}
-            status-indivest
-         {% elif entry.Status == 'Unapproved' %}
-            status-unapproved
-         {% elif 'Mismatch' in entry.Status %}
-            {% if 'Decision Not Found' in entry.Decision %}
-              status-mismatch-error
-            {% else %}
-              status-mismatch
-            {% endif %}
-         {% endif %}">
+                 status-authorized
+               {% elif entry.Status == 'InDivest' %}
+                 status-indivest
+               {% elif entry.Status == 'Unapproved' %}
+                 {% if 'Decision Not Found' in entry.Decision %}
+                   status-mismatch-error
+                 {% else %}
+                   status-unapproved
+                 {% endif %}
+               {% elif 'Mismatch' in entry.Status %}
+                 {% if 'Decision Not Found' in entry.Decision %}
+                   status-mismatch-error
+                 {% else %}
+                   status-mismatch
+                 {% endif %}
+               {% endif %}">
         <td>{{ loop.index }}</td>
         <td>{{ entry.Name }}</td>
         <td>{{ entry.Tid }}</td>
         <td>{{ entry.Version }}</td>
         <td>
-          {% if "Unapproved" in entry.Decision %}
+          {% if "Decision Not Found" in entry.Decision %}
+            <i class="fa-solid fa-circle-question" style="color: gray;"></i>
+          {% elif "Unapproved" in entry.Decision %}
             <i class="fa-solid fa-circle-xmark" style="color: red;"></i>
           {% elif "DIVEST" in entry.Decision %}
             <i class="fa-solid fa-circle-exclamation" style="color: orange;"></i>
