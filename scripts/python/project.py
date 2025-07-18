@@ -66,38 +66,38 @@ def get_current_decision(driver, version, curr_year=None, curr_quarter=None):
       return "Decision Not Found"
       
 def get_all_version_decisions(driver):
-    curr_year, curr_quarter = get_current_quarter()
-    target_header = f"CY{curr_year} {curr_quarter}"
-    QUARTER_MAP = generate_quarter_map(curr_year)
+  curr_year, curr_quarter = get_current_quarter()
+  target_header = f"CY{curr_year} {curr_quarter}"
+  QUARTER_MAP = generate_quarter_map(curr_year)
 
-    table = driver.find_element(By.XPATH, "//table[.//th[contains(text(), 'CY')]]")
-    rows = table.find_elements(By.TAG_NAME, "tr")
+  table = driver.find_element(By.XPATH, "//table[.//th[contains(text(), 'CY')]]")
+  rows = table.find_elements(By.TAG_NAME, "tr")
 
-    col_index = QUARTER_MAP.get(target_header)
-    if col_index is None or len(rows) < 2:
-        logging.warning("Couldn't find valid column or table rows.")
-        return []
+  col_index = QUARTER_MAP.get(target_header)
+  if col_index is None or len(rows) < 2:
+    logging.warning("Couldn't find valid column or table rows.")
+    return []
 
-    col_index += 1
-    version_map = []
+  col_index += 1
+  version_map = []
 
-    for row in rows[2:]:
-        cells = row.find_elements(By.TAG_NAME, "td")
-        if not cells or col_index >= len(cells):
-            continue
-        version = cells[0].text.strip()
-        decision = cells[col_index].text.strip()
-        if any(char.isdigit() for char in version):  
-            version_map.append((version, decision))
+  for row in rows[2:]:
+    cells = row.find_elements(By.TAG_NAME, "td")
+    if not cells or col_index >= len(cells):
+      continue
+    version = cells[0].text.strip()
+    decision = cells[col_index].text.strip()
+    if any(char.isdigit() for char in version):  
+      version_map.append((version, decision))
 
-    return version_map
+  return version_map
 
 def get_decision_date(driver):
   try:
     decision_text = driver.execute_script("return document.body.innerText.match(/Decision Date \\((.*?)\\)/)?.[1] || 'Unknown';")
         
     if decision_text:
-        return decision_text.split(" ")
+      return decision_text.split(" ")
       
     logging.warning("Decision date not found.")
     return "Not Found"
@@ -151,35 +151,35 @@ def fetch_data(driver, url, version):
     logging.error("Failed to obtain elements: %s", e)
     return None
   
-def extract_numeric_version(str):
-    match = re.search(r'\d+(\.\d+)?', str)
-    if match:
-        try:
-            return parse_version(match.group(0))
-        except InvalidVersion:
-            return None
-    return None
+def extract_numeric_version(v_str):
+  match = re.search(r'\d+(\.\d+)?', v_str)
+  if match:
+    try:
+      return parse_version(match.group(0))
+    except InvalidVersion:
+      return None
+  return None
 
 def find_next_valid_version(current_version, version_map):
-    current = extract_numeric_version(current_version)
-    if current is None:
-        logging.warning("Could not parse current version: %s", current_version)
-        return None, None
-    candidates = []
-
-    for version, decision in version_map:
-        try:
-            ver = extract_numeric_version(version)
-            if ver > current and "Authorized" in decision and "DIVEST" not in decision:
-                candidates.append((ver, version, decision))
-        except Exception:
-            continue  
-
-    if candidates:
-        candidates.sort()
-        _, next_version, next_decision = candidates[0]
-        return next_version, next_decision
+  current = extract_numeric_version(current_version)
+  if current is None:
+    logging.warning("Could not parse current version: %s", current_version)
     return None, None
+  candidates = []
+
+  for version, decision in version_map:
+    try:
+      ver = extract_numeric_version(version)
+      if ver > current and "Authorized" in decision and "DIVEST" not in decision:
+        candidates.append((ver, version, decision))
+    except Exception:
+      continue  
+
+  if candidates:
+    candidates.sort()
+    _, next_version, next_decision = candidates[0]
+    return next_version, next_decision
+  return None, None
 
   
 #Helper function to check if the url actually has the proper page
@@ -227,7 +227,7 @@ def process_entry(driver, b_url, tid, version, name, decision):
   entry_result = fetch_data(driver, url, version)
   if entry_result is not None:
     entry_result["Status"] = check_decision_status(decision, version, entry_result["Decision"], entry_result["Version"])
-    if "Unapproved" in entry_result["Decision"] or "Decision Not Found" in entry_result["Decision"] or "DIVEST" in entry_result["Decision"]:
+    if "Unapproved" in entry_result["Decision"] or"Decision Not Found" in entry_result["Decision"] or "DIVEST" in entry_result["Decision"]:
       version_map = get_all_version_decisions(driver)
       next_version, next_decision = find_next_valid_version(version, version_map)
       if next_version:
