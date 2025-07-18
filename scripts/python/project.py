@@ -269,7 +269,7 @@ if __name__ == "__main__":
       try:
         result = process_entry(web_driver, base_url, file_tid, file_version, entry_name, file_decision)
         if date is not None and date != result["Decision Date"]:
-          result["Decision Date"] = f"Updated from {date} to {result['Decision Date']}"
+          result["Decision Date"] = f"Updated now: {result['Decision Date']}"
         report["trm_entries"].append(result)
       except Exception as e:
         logging.error("Error processing TID %s with version %s: %s", file_tid, file_version, e)
@@ -285,7 +285,7 @@ if __name__ == "__main__":
   template_dir = script_dir / "templates"
 
   env = Environment(loader=FileSystemLoader(template_dir))
-  template = env.get_template("report_template.html")
+  template = env.get_template("report_template.html.j2")
 
   # Render HTML with your report data
   html_output = template.render(trm_entries=report["trm_entries"])
