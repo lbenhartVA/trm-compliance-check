@@ -83,6 +83,7 @@
         <th>Decision</th>
         <th>Status</th>
         <th>Decision Date</th>
+        <th>Next Approved Version</th>
         <th>URL</th>
       </tr>
     </thead>
@@ -126,6 +127,7 @@
         </td>
         <td>{{ entry.Status }}</td>
         <td>{{ entry["Decision Date"] or "N/A" }}</td>
+        <td>{{ entry["Next Approved Version"] or "Current Version is Approved" }}</td>
         <td><a href="{{ entry.URL }}" target="_blank">{{ entry.URL }}</a></td>
       </tr>
       {% endfor %}

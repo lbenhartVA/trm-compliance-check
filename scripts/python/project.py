@@ -6,6 +6,8 @@ from pathlib import Path
 from datetime import datetime
 from selenium import webdriver
 from jinja2 import Environment, FileSystemLoader
+from packaging.version import parse as parse_version, InvalidVersion
+import re
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
@@ -51,7 +53,6 @@ def get_current_decision(driver, version, curr_year=None, curr_quarter=None):
     logging.warning("Couldn't find column for %s", target_header)
     return "Decision Not Found"
   col_index += 1
-
   # Search for the version row
   for row in rows[2:]:
     cells = row.find_elements(By.TAG_NAME, "td")
@@ -63,43 +64,33 @@ def get_current_decision(driver, version, curr_year=None, curr_quarter=None):
         return cells[col_index].text.strip()
       logging.warning("Column index %s out of range for version row %s", col_index, row_version)
       return "Decision Not Found"
+      
+def get_all_version_decisions(driver):
+    curr_year, curr_quarter = get_current_quarter()
+    target_header = f"CY{curr_year} {curr_quarter}"
+    QUARTER_MAP = generate_quarter_map(curr_year)
 
-  logging.warning("Version %s not found in matrix", version)
-  return "Decision Not Found"
+    table = driver.find_element(By.XPATH, "//table[.//th[contains(text(), 'CY')]]")
+    rows = table.find_elements(By.TAG_NAME, "tr")
 
-def get_all_decisions(driver):
-  curr_year, curr_quarter = get_current_quarter()
-  target_header = f"CY{curr_year} {curr_quarter}"
+    col_index = QUARTER_MAP.get(target_header)
+    if col_index is None or len(rows) < 2:
+        logging.warning("Couldn't find valid column or table rows.")
+        return []
 
-  #Creates the quarter map
-  QUARTER_MAP = generate_quarter_map(curr_year)
-  table = driver.find_element(By.XPATH, "//table[.//th[contains(text(), 'CY')]]")
-  rows = table.find_elements(By.TAG_NAME, "tr")
+    col_index += 1
+    version_map = []
 
-  if len(rows) < 2:
-    logging.warning("Table does not have enough header rows.")
-    return "Decision Not Found"
-  #finds how far our target header is in the map
-  col_index = QUARTER_MAP.get(target_header)
-  if col_index is None:
-    logging.warning("Couldn't find column for %s", target_header)
-    return "Decision Not Found"
-  col_index += 1
-  version_map = []
+    for row in rows[2:]:
+        cells = row.find_elements(By.TAG_NAME, "td")
+        if not cells or col_index >= len(cells):
+            continue
+        version = cells[0].text.strip()
+        decision = cells[col_index].text.strip()
+        if any(char.isdigit() for char in version):  
+            version_map.append((version, decision))
 
-  # Search for the version row
-  for row in rows[2:]:
-    cells = row.find_elements(By.TAG_NAME, "td")
-    if not cells:
-      continue
-    row_version = cells[0].text.strip()
-    if col_index < len(cells):
-      if any(char.isdigit() for char in row_version):
-        decision =  cells[col_index].text.strip()
-        version_map.append((row_version, decision))
-    logging.warning("Column index %s out of range for version row %s", col_index, row_version)
-
-  return version_map
+    return version_map
 
 def get_decision_date(driver):
   try:
@@ -142,7 +133,7 @@ def fetch_data(driver, url, version):
     decision_date = get_decision_date(driver)
     cur_year, cur_quarter = get_current_quarter()
     decision = get_current_decision(driver, version, cur_year, cur_quarter)
-    clean_decision = decision.replace("\n", " ")
+    clean_decision = decision.replace("\n", " ") if decision else "Decision Not Found"
 
      #All the data needed is stored in this entry
     entry = {
@@ -160,6 +151,35 @@ def fetch_data(driver, url, version):
     logging.error("Failed to obtain elements: %s", e)
     return None
   
+def extract_numeric_version(str):
+    match = re.search(r'\d+(\.\d+)?', str)
+    if match:
+        try:
+            return parse_version(match.group(0))
+        except InvalidVersion:
+            return None
+    return None
+
+def find_next_valid_version(current_version, version_map):
+    current = extract_numeric_version(current_version)
+    if current is None:
+        logging.warning("Could not parse current version: %s", current_version)
+        return None, None
+    candidates = []
+
+    for version, decision in version_map:
+        try:
+            ver = extract_numeric_version(version)
+            if ver > current and "Authorized" in decision and "DIVEST" not in decision:
+                candidates.append((ver, version, decision))
+        except Exception:
+            continue  
+
+    if candidates:
+        candidates.sort()
+        _, next_version, next_decision = candidates[0]
+        return next_version, next_decision
+    return None, None
 
   
 #Helper function to check if the url actually has the proper page
@@ -200,12 +220,20 @@ def process_entry(driver, b_url, tid, version, name, decision):
     "Version": version,
     "Decision": "Unapproved (Invalid Link)",
     "Status": "Unapproved",
+    "Next Approved Version": "None Found",
     "Decision Date": "None" 
     }
 
   entry_result = fetch_data(driver, url, version)
   if entry_result is not None:
     entry_result["Status"] = check_decision_status(decision, version, entry_result["Decision"], entry_result["Version"])
+    if "Unapproved" in entry_result["Decision"] or "Decision Not Found" in entry_result["Decision"] or "DIVEST" in entry_result["Decision"]:
+      version_map = get_all_version_decisions(driver)
+      next_version, next_decision = find_next_valid_version(version, version_map)
+      if next_version:
+        entry_result["Next Approved Version"] = f"{next_version}\n {next_decision}"
+      else:
+        entry_result["Next Approved Version"] = "None found"
     return entry_result
   return None
 
