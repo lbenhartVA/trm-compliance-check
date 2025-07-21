@@ -47,7 +47,6 @@ def extract_numeric_version(v_str):
   return None
 
 
-  
 #Helper function to check if the url actually has the proper page
 def is_url_valid(url, timeout=10):
   headers = {"User-Agent": "Mozilla/5.0"}
@@ -68,11 +67,11 @@ def is_url_valid(url, timeout=10):
 
 def get_decision_date(driver):
   try:
-    decision_text = driver.execute_script("return document.body.innerText.match(/Decision Date \\((.*?)\\)/)?.[1] || 'Unknown';")
-        
+    decision_text = driver.execute_script
+    ("return document.body.innerText.match(/Decision Date \\((.*?)\\)/)?.[1] || 'Unknown';")
     if decision_text:
       return decision_text.split(" ")
-      
+    
     logging.warning("Decision date not found.")
     return "Not Found"
     
@@ -107,7 +106,7 @@ def get_current_decision(driver, version, curr_year, curr_quarter, quarter_map):
         return cells[col_index].text.strip()
       logging.warning("Column index %s out of range for version row %s", col_index, row_version)
       return DECISION_NOT_FOUND
-      
+    
 def get_all_version_decisions(driver, year, quarter, quarter_map):
   target_header = f"CY{year} {quarter}"
 

@@ -115,22 +115,29 @@ class TestSeleniumFunctions(unittest.TestCase):
     url = "https://www.oit.va.gov/Services/TRM/ToolPage.aspx?tid=9952&tab=2"
     version = "Win 10.x"
     self.driver.get(url)
-    decision = get_current_decision(self.driver, version)
+    curr_year, curr_quarter = get_current_quarter()
+    map = generate_quarter_map(2025)
+    decision = get_current_decision(self.driver, version, curr_year, curr_quarter, map)
     self.assertTrue("Authorized" in decision or "Decision Not Found" != decision)
 
   def test_get_decision_one_row(self):
     driver = MagicMock()
     table = MagicMock()
     table.find_elements.return_value = [MagicMock()]
+    curr_year, curr_quarter = get_current_quarter()
     driver.find_element.return_value = table
-    decision = get_current_decision(driver, version="Win 10.x", curr_year=2025, curr_quarter="Q2")
+    map = generate_quarter_map(curr_year)
+    version = "Win 10.x"
+    decision = get_current_decision(driver, version, curr_year, curr_quarter, map)
     self.assertTrue(decision == "Decision Not Found")
 
 
   def test_vaild_entry(self):
     url = "https://www.oit.va.gov/Services/TRM/ToolPage.aspx?tid=9952&tab=2"
     version = "Win 10.x"
-    entry = fetch_data(self.driver, url, version)
+    curr_year, curr_quarter = get_current_quarter()
+    map = generate_quarter_map(curr_year)
+    entry = fetch_data(self.driver, url, version, curr_year, curr_quarter, map)
     self.assertIsInstance(entry, dict)
     self.assertEqual(entry["Tid"], "9952")
     self.assertEqual(entry["Version"], version)
@@ -141,7 +148,9 @@ class TestSeleniumFunctions(unittest.TestCase):
   def test_invalid_entry(self):
     url = "https://www.oit.va.gov/Services/TRM/ToolPage.aspx?tid=9952&tab=2"
     version = "Win 21.x"
-    entry = fetch_data(self.driver, url, version)
+    curr_year, curr_quarter = get_current_quarter()
+    map = generate_quarter_map(curr_year)
+    entry = fetch_data(self.driver, url, version, curr_year, curr_quarter, map)
     self.assertTrue(entry["Decision"] == "Decision Not Found")
     
 class TestFetchDataExceptions(unittest.TestCase):
@@ -149,8 +158,10 @@ class TestFetchDataExceptions(unittest.TestCase):
   @patch("project.WebDriverWait")
   def test_timeout_exception(self, mock_wait, mock_log):
     mock_driver = MagicMock()
+    curr_year, curr_quarter = get_current_quarter()
+    map = generate_quarter_map(curr_year)
     mock_driver.get.side_effect = TimeoutException("Simulated timeout")
-    result = fetch_data(mock_driver, "https://example.com", "Win 10.x")
+    result = fetch_data(mock_driver, "https://example.com", "Win 10.x", curr_year, curr_quarter, map)
     self.assertIsNone(result)
 
        
@@ -159,8 +170,9 @@ class TestFetchDataExceptions(unittest.TestCase):
   def test_connection_error(self, mock_log, mock_wait):
     mock_driver = MagicMock()
     mock_driver.get.side_effect = ConnectionError("Simulated connection error")
-
-    result = fetch_data(mock_driver, "https://example.com", "Win 10.x")
+    curr_year, curr_quarter = get_current_quarter()
+    map = generate_quarter_map(curr_year)
+    result = fetch_data(mock_driver, "https://example.com", "Win 10.x", curr_year, curr_quarter, map)
     self.assertIsNone(result)
 
 
@@ -169,8 +181,9 @@ class TestFetchDataExceptions(unittest.TestCase):
   def test_webdriver_error(self, mock_log, mock_wait):
     mock_driver = MagicMock()
     mock_driver.get.side_effect = WebDriverException("Simulated WebDriverException")
-
-    result = fetch_data(mock_driver, "https://example.com", "Win 10.x")
+    curr_year, curr_quarter = get_current_quarter()
+    map = generate_quarter_map(curr_year)
+    result = fetch_data(mock_driver, "https://example.com", "Win 10.x", curr_year, curr_quarter, map)
     self.assertIsNone(result)
 
 if __name__ == "__main__":
