@@ -1,13 +1,13 @@
 import json
-import yaml
-import requests
-import logging
+import re
 from pathlib import Path
 from datetime import datetime
 from selenium import webdriver
+import logging
+import yaml
+import requests
 from jinja2 import Environment, FileSystemLoader
 from packaging.version import parse as parse_version, InvalidVersion
-import re
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
@@ -67,18 +67,17 @@ def is_url_valid(url, timeout=10):
 
 def get_decision_date(driver):
   try:
-    decision_text = driver.execute_script
-    ("return document.body.innerText.match(/Decision Date \\((.*?)\\)/)?.[1] || 'Unknown';")
+    decision_text = driver.execute_script("return document.body.innerText.match(/Decision Date \\((.*?)\\)/)?.[1] || 'Unknown';")
     if decision_text:
       return decision_text.split(" ")
-    
+
     logging.warning("Decision date not found.")
     return "Not Found"
-    
+
   except NoSuchElementException:
     logging.warning("Element with decision date not found.")
     return "Not Found"
-  
+
 def get_current_decision(driver, version, curr_year, curr_quarter, quarter_map):
   target_header = f"CY{curr_year} {curr_quarter}"
 
@@ -103,10 +102,11 @@ def get_current_decision(driver, version, curr_year, curr_quarter, quarter_map):
     row_version = cells[0].text.strip()
     if row_version == version:
       if col_index < len(cells):
-        return cells[col_index].text.strip()
+        decision =  cells[col_index].text.strip()
+        return decision
       logging.warning("Column index %s out of range for version row %s", col_index, row_version)
       return DECISION_NOT_FOUND
-    
+
 def get_all_version_decisions(driver, year, quarter, quarter_map):
   target_header = f"CY{year} {quarter}"
 
@@ -127,7 +127,7 @@ def get_all_version_decisions(driver, year, quarter, quarter_map):
       continue
     version = cells[0].text.strip()
     decision = cells[col_index].text.strip()
-    if any(char.isdigit() for char in version):  
+    if any(char.isdigit() for char in version):
       version_map.append((version, decision))
 
   return version_map
@@ -155,10 +155,12 @@ def find_next_valid_version(current_version, version_map):
   for version, decision in version_map:
     try:
       ver = extract_numeric_version(version)
-      if "Authorized" in decision and "DIVEST" not in decision:
+      if ver is None:
+        continue
+      if "Authorized" in decision and "DIVEST" not in decision and "POA&M" not in decision:
         candidates.append((ver, version, decision))
     except Exception:
-      continue  
+      continue
 
   if candidates:
     candidates.sort()
@@ -211,11 +213,11 @@ def fetch_data(driver, url, version, year, quarter, quarter_map):
   except (NoSuchElementException, StaleElementReferenceException, TimeoutException) as e:
     logging.error("Failed to obtain elements: %s", e)
     return None
-  
 
 
 
-def process_entry(driver, b_url, tid, version, name, decision, year, quarter, quarter_map):
+
+def process_entry(driver, b_url, tid, version, name, decision, yr, qr, q_map):
   url = f"{b_url}?tid={tid}&tab=2"
   if not is_url_valid(url):
     return {
@@ -229,23 +231,22 @@ def process_entry(driver, b_url, tid, version, name, decision, year, quarter, qu
     "Decision Date": "None" 
     }
 
-  entry_result = fetch_data(driver, url, version, year, quarter, quarter_map)
+  entry_result = fetch_data(driver, url, version, yr, qr, q_map)
   if entry_result is not None:
     entry_result["Status"] = check_decision_status(decision, version, entry_result["Decision"], entry_result["Version"])
     if any(x in entry_result["Decision"] for x in ["Unapproved", DECISION_NOT_FOUND, "DIVEST"]):
-      version_map = get_all_version_decisions(driver, year, quarter, quarter_map)
+      version_map = get_all_version_decisions(driver, yr, qr, q_map)
       next_version, next_decision = find_next_valid_version(version, version_map)
       if next_version:
         entry_result["Next Approved Version"] = f"{next_version}\n {next_decision}"
       else:
-        entry_result["Next Approved Version"] = "None found"
+        entry_result["Next Approved Version"] = "No Approved Version Found"
     return entry_result
   return None
 
-# === Main Function ===
-
-if __name__ == "__main__":
-  #Opens a headless Chrome Browser
+# === Report Generation ===
+def generate_report():
+#Opens a headless Chrome Browser
   chrome_options = Options()
   chrome_options.add_argument("--headless")
   chrome_options.add_argument("--disable-gpu")
@@ -269,13 +270,14 @@ if __name__ == "__main__":
   "trm_base_url": base_url,
   "trm_entries": []
 }
-  year, quarter = get_current_quarter()
-  quarter_map = generate_quarter_map(year)
+  cur_year, cur_quarter = get_current_quarter()
+  qmap = generate_quarter_map(cur_year)
   #Iterates through each entry and runs fetch data on the valid entries
   try:
     for file_tid, file_version, entry_name, file_decision, date in input_data:
       try:
-        result = process_entry(web_driver, base_url, file_tid, file_version, entry_name, file_decision, year, quarter, quarter_map)
+        result = process_entry(web_driver,
+                                base_url, file_tid, file_version, entry_name, file_decision, cur_year, cur_quarter, qmap)
         report["trm_entries"].append(result)
       except Exception as e:
         logging.error("Error processing TID %s with version %s: %s", file_tid, file_version, e)
@@ -299,5 +301,8 @@ if __name__ == "__main__":
   # Save to file
   with open("trm_report.html", "w", encoding="utf-8") as f:
     f.write(html_output)
-  
-    
+
+
+# === Main Function ===
+if __name__ == "__main__":
+  generate_report()

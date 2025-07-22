@@ -2,3 +2,4 @@ __pycache__/
 .coverage
 trm_report.json
 trm_report.html
+htmlcov/
