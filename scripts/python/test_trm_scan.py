@@ -62,7 +62,6 @@ class TestTRMHelpers(unittest.TestCase):
     self.assertIn("CY2024 Q3", QUARTER_MAP)
     self.assertIn("CY2026 Q1", QUARTER_MAP)
 
-#This class is used to test the functions that use the selenium WebDriver
 class TestSeleniumFunctions(unittest.TestCase):
 
   @classmethod
@@ -75,34 +74,32 @@ class TestSeleniumFunctions(unittest.TestCase):
   def tearDownClass(cls):
     cls.driver.quit()
 
-
-  def test_vaild_entry(self):
+  def test_valid_entry(self):
     url = "https://www.oit.va.gov/Services/TRM/ToolPage.aspx?tid=9952&tab=2"
-    version = "Win 10.x"
-    entry = fetch_data(self.driver, url, version, CURR_YEAR, CURR_QUARTER, QUARTER_MAP)
+    version = "Linux 1.8"
+    entry = fetch_data(self.driver, url, version)
     self.assertIsInstance(entry, dict)
     self.assertEqual(entry["Tid"], "9952")
     self.assertEqual(entry["Version"], version)
     self.assertTrue(entry["Name"])
     self.assertIn("Decision", entry)
 
-
   def test_invalid_entry(self):
     url = "https://www.oit.va.gov/Services/TRM/ToolPage.aspx?tid=9952&tab=2"
     version = "Win 21.x"
-    entry = fetch_data(self.driver, url, version, CURR_YEAR, CURR_QUARTER, QUARTER_MAP)
-    self.assertTrue(entry["Decision"] == "Decision Not Found")
+    entry = fetch_data(self.driver, url, version)
+    self.assertEqual(entry["Decision"], "Decision Not Found")
 
   def test_invalid_current_version(self):
     result = find_next_valid_version("abc", [("2.0", "Authorized")])
-    self.assertEqual(result, (None, None))
+    self.assertEqual(result, ("2.0", "Authorized"))
 
   def test_skips_invalid_versions_in_map(self):
     version_map = [
       ("abc", "Authorized"),
       ("1.5", "Authorized"),
       ("bad.version", "Authorized")
-    ]
+      ]
     result = find_next_valid_version("1.0", version_map)
     self.assertEqual(result, ("1.5", "Authorized"))
 
@@ -112,9 +109,8 @@ class TestSeleniumFunctions(unittest.TestCase):
       ("2.0", "Authorized"),
       ("3.0", "Authorized")
     ]
-    current = "1.0"
-    result = find_next_valid_version(current, version_map)
-    self.assertEqual(result, ("1.0", "Authorized"))
+    result = find_next_valid_version("1.0", version_map)
+    self.assertEqual(result, ("2.0", "Authorized"))
 
   def test_skips_divest_and_poam(self):
     version_map = [
@@ -122,10 +118,9 @@ class TestSeleniumFunctions(unittest.TestCase):
       ("2.0", "DIVEST"),
       ("3.0", "POA&M"),
       ("4.0", "Authorized")
-      ]
-    current = "1.0"
-    result = find_next_valid_version(current, version_map)
-    self.assertEqual(result, ("1.0", "Authorized"))
+    ]
+    result = find_next_valid_version("1.0", version_map)
+    self.assertEqual(result, ("4.0", "Authorized"))
 
   def test_no_authorized_version_found(self):
     version_map = [
@@ -135,13 +130,15 @@ class TestSeleniumFunctions(unittest.TestCase):
     result = find_next_valid_version("1.0", version_map)
     self.assertEqual(result, (None, None))
 
+
 class TestFetchDataExceptions(unittest.TestCase):
+
   @patch("project.logging.error")
   @patch("project.WebDriverWait")
   def test_timeout_exception(self, mock_wait, mock_log):
     mock_driver = MagicMock()
     mock_driver.get.side_effect = TimeoutException("Simulated timeout")
-    result = fetch_data(mock_driver, "https://example.com", "Win 10.x", CURR_YEAR, CURR_QUARTER, QUARTER_MAP)
+    result = fetch_data(mock_driver, "https://example.com", "Win 10.x")
     self.assertIsNone(result)
 
   @patch("project.WebDriverWait")
@@ -149,7 +146,7 @@ class TestFetchDataExceptions(unittest.TestCase):
   def test_connection_error(self, mock_log, mock_wait):
     mock_driver = MagicMock()
     mock_driver.get.side_effect = ConnectionError("Simulated connection error")
-    result = fetch_data(mock_driver, "https://example.com", "Win 10.x", CURR_YEAR, CURR_QUARTER, QUARTER_MAP)
+    result = fetch_data(mock_driver, "https://example.com", "Win 10.x")
     self.assertIsNone(result)
 
   @patch("project.WebDriverWait")
@@ -157,8 +154,9 @@ class TestFetchDataExceptions(unittest.TestCase):
   def test_webdriver_error(self, mock_log, mock_wait):
     mock_driver = MagicMock()
     mock_driver.get.side_effect = WebDriverException("Simulated WebDriverException")
-    result = fetch_data(mock_driver, "https://example.com", "Win 10.x", CURR_YEAR, CURR_QUARTER, QUARTER_MAP)
+    result = fetch_data(mock_driver, "https://example.com", "Win 10.x")
     self.assertIsNone(result)
+
 
 
 class TestIsUrlValid(unittest.TestCase):
@@ -228,7 +226,7 @@ class TestGetAllVersionDecisions(unittest.TestCase):
     driver.find_element.return_value.find_elements.return_value = []
     bad_quarter_map = {"CY2025 Q3": None}
 
-    result = get_all_version_decisions(driver, 2025, "Q3", bad_quarter_map)
+    result = get_all_version_decisions(driver)
     self.assertEqual(result, [])
 
   def test_insufficient_rows(self):
@@ -237,7 +235,7 @@ class TestGetAllVersionDecisions(unittest.TestCase):
     driver.find_element.return_value = table
     table.find_elements.return_value = self.mock_table_structure([["Header"]])  # Only 1 row
 
-    result = get_all_version_decisions(driver, 2025, "Q3", self.quarter_map)
+    result = get_all_version_decisions(driver)
     self.assertEqual(result, [])
 
   def test_column_index_out_of_bounds(self):
@@ -252,7 +250,7 @@ class TestGetAllVersionDecisions(unittest.TestCase):
       ["2.5"]   # Missing col_index
     ])
 
-    result = get_all_version_decisions(driver, 2025, "Q3", self.quarter_map)
+    result = get_all_version_decisions(driver)
     self.assertEqual(result, [])
 
 class TestGenerateReport(unittest.TestCase):
@@ -266,34 +264,36 @@ class TestGenerateReport(unittest.TestCase):
   @patch("project.process_entry")
   @patch("project.get_current_quarter", return_value=(2025, "Q3"))
   @patch("project.generate_quarter_map", return_value={"CY2025 Q3": 2})
-  def test_generate_report_successful(
-    self, mock_quarter, mock_map, mock_process_entry, mock_dumps,
-    mock_path, mock_open_fn, mock_yaml, mock_env, mock_chrome
-    ):
-      # Setup YAML data
+  def test_generate_report_successful(self, mock_quarter, mock_map, mock_process_entry,
+                                       mock_dumps, mock_path, mock_open_fn,
+                                         mock_yaml, mock_env, mock_chrome):
     mock_yaml.return_value = {
       "trm_base_url": "http://example.com",
       "trm_entries": [
-        {"tid": "001", "version": "1.0", "name": "ToolA", "decision": "Unapproved", "approval_date": "2025-01-01"}
+      {
+        "tid": "001",
+        "version": "1.0",
+        "name": "ToolA",
+        "decision": "Unapproved",
+        "approval_date": "2025-01-01"
+          }
         ]
-    }
+      }
 
-    # Simulate a processed result
     mock_process_entry.return_value = {
-      "Tid": "001", "Version": "1.0", "Decision": "Unapproved", "Status": "Unapproved"
-    }
+      "Tid": "001",
+      "Version": "1.0",
+      "Decision": "Unapproved",
+      "Status": "Unapproved"
+      }
 
-    # Mock template rendering
     mock_template = MagicMock()
     mock_template.render.return_value = "<html>Report</html>"
     mock_env.return_value.get_template.return_value = mock_template
 
-    # Run function
     generate_report()
 
-    # Check that report was rendered and written
     mock_template.render.assert_called()
-
     mock_open_fn.assert_any_call("trm_report.json", "w", encoding="utf-8")
     mock_open_fn.assert_any_call("trm_report.html", "w", encoding="utf-8")
     mock_dumps.assert_called_once()
@@ -308,14 +308,10 @@ class TestProcessEntry(unittest.TestCase):
     self.version = "1.0"
     self.name = "Tool A"
     self.decision = "Unapproved"
-    self.year = 2025
-    self.quarter = "Q3"
-    self.q_map = {"CY2025 Q3": 2}
 
   @patch("project.is_url_valid", return_value=False)
   def test_invalid_url(self, mock_url_check):
-    result = process_entry(self.driver, self.base_url, self.tid, self.version, self.name,
-                           self.decision, self.year, self.quarter, self.q_map)
+    result = process_entry(self.driver, self.base_url, self.tid, self.version, self.name, self.decision)
     expected_url = f"{self.base_url}?tid={self.tid}&tab=2"
     self.assertEqual(result["URL"], expected_url)
     self.assertEqual(result["Decision"], INVALID_LINK_DECISION)
@@ -325,8 +321,7 @@ class TestProcessEntry(unittest.TestCase):
   @patch("project.is_url_valid", return_value=True)
   @patch("project.fetch_data", return_value=None)
   def test_fetch_data_none(self, mock_fetch, mock_url_check):
-    result = process_entry(self.driver, self.base_url, self.tid, self.version, self.name,
-                            self.decision, self.year, self.quarter, self.q_map)
+    result = process_entry(self.driver, self.base_url, self.tid, self.version, self.name, self.decision)
     self.assertIsNone(result)
 
   @patch("project.is_url_valid", return_value=True)
@@ -335,7 +330,7 @@ class TestProcessEntry(unittest.TestCase):
   @patch("project.find_next_valid_version", return_value=("2.0", "Authorized"))
   @patch("project.check_decision_status", return_value="Unapproved")
   def test_unapproved_decision_path(self, mock_status, mock_next_version,
-                                     mock_get_versions, mock_fetch, mock_url_check):
+                                      mock_get_versions, mock_fetch, mock_url_check):
     mock_fetch.return_value = {
       "URL": f"{self.base_url}?tid={self.tid}&tab=2",
       "Name": self.name,
@@ -345,9 +340,7 @@ class TestProcessEntry(unittest.TestCase):
       "Decision Date": "2025-01-01"
       }
 
-    result = process_entry(self.driver, self.base_url, self.tid, self.version, self.name,
-                               self.decision, self.year, self.quarter, self.q_map)
-
+    result = process_entry(self.driver, self.base_url, self.tid, self.version, self.name, self.decision)
     self.assertEqual(result["Status"], "Unapproved")
     self.assertEqual(result["Next Approved Version"], "2.0\n Authorized")
 
@@ -362,14 +355,11 @@ class TestProcessEntry(unittest.TestCase):
       "Version": self.version,
       "Decision": "Authorized",
       "Decision Date": "2025-01-01"
-    }
+      }
 
-    result = process_entry(self.driver, self.base_url, self.tid, self.version, self.name,
-                               self.decision, self.year, self.quarter, self.q_map)
-
+    result = process_entry(self.driver, self.base_url, self.tid, self.version, self.name, self.decision)
     self.assertEqual(result["Status"], "InCompliance")
     self.assertNotIn("Next Approved Version", result)
-
 
 if __name__ == "__main__":
   unittest.main()
