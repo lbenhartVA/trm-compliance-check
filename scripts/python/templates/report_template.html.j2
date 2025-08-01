@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>TRM Compliance Report</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background-color: #f3f3f3;
+    }
+
+    h2 {
+      margin-bottom: 5px;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      background-color: #fff;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
+    }
+
+    thead th {
+      position: sticky;
+      top: 0;
+      background-color: #f0f0f0;
+      border-bottom: 2px solid #ccc;
+      z-index: 1;
+    }
+
+    th, td {
+      border: 1px solid #ccc;
+      padding: 10px;
+      text-align: left;
+    }
+
+    tr:hover {
+      background-color: #f0f8ff;
+    }
+
+    /* Status-based row coloring */
+    .status-authorized {
+      background-color: #e6ffed;
+    }
+
+    .status-indivest {
+      background-color: #ffe5e5;
+    }
+
+    .status-unapproved {
+      background-color: #ffe5e5;
+    }
+
+    .status-mismatch {
+      background-color: #fffccf;
+    }
+
+    .status-mismatch-error {
+      background-color: #f0f0f0;
+    }
+
+    /* URL link styling */
+    a {
+      color: #2a5db0;
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <h2>TRM Compliance Report</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Name</th>
+        <th>Tid</th>
+        <th>Version</th>
+        <th>Decision</th>
+        <th>Status</th>
+        <th>Decision Date</th>
+        <th>Next Approved Version</th>
+        <th>URL</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for entry in trm_entries %}
+      <tr
+        class="{% if entry.Status == 'InCompliance' %}
+                 status-authorized
+               {% elif entry.Status == 'InDivest' %}
+                 status-indivest
+               {% elif entry.Status == 'Unapproved' %}
+                 {% if 'Decision Not Found' in entry.Decision %}
+                   status-mismatch-error
+                 {% else %}
+                   status-unapproved
+                 {% endif %}
+               {% elif 'Mismatch' in entry.Status %}
+                 {% if 'Decision Not Found' in entry.Decision %}
+                   status-mismatch-error
+                 {% else %}
+                   status-mismatch
+                 {% endif %}
+               {% endif %}">
+        <td>{{ loop.index }}</td>
+        <td>{{ entry.Name }}</td>
+        <td>{{ entry.Tid }}</td>
+        <td>{{ entry.Version }}</td>
+        <td>
+          {% if "Decision Not Found" in entry.Decision %}
+            <i class="fa-solid fa-circle-question" style="color: gray;"></i>
+          {% elif "Unapproved" in entry.Decision %}
+            <i class="fa-solid fa-circle-xmark" style="color: red;"></i>
+          {% elif "DIVEST" in entry.Decision %}
+            <i class="fa-solid fa-circle-exclamation" style="color: orange;"></i>
+          {% elif "Authorized" in entry.Decision %}
+            <i class="fa-solid fa-circle-check" style="color: green;"></i>
+          {% else %}
+            <i class="fa-solid fa-circle-question" style="color: gray;"></i>
+          {% endif %}
+          {{ entry.Decision }}
+        </td>
+        <td>{{ entry.Status }}</td>
+        <td>{{ entry["Decision Date"] or "N/A" }}</td>
+        <td>{{ entry["Next Approved Version"] or "Current Version is Approved" }}</td>
+        <td><a href="{{ entry.URL }}" target="_blank">{{ entry.URL }}</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</body>
+</html>
